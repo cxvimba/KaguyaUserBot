@@ -1,0 +1,5 @@
+kurigram
+tgcrypto
+python-dotenv
+diskcache
+aiohttp
