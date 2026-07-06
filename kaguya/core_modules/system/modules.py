@@ -290,6 +290,119 @@ async def install_module(self, client: Client, message: Message):
 
             raise load_error
 
+    # Установка одиночного модуля .txt, .py
+    else:
+        module_name = Path(doc.file_name).stem
+
+        if module_name.lower() in forbidden_filenames:
+            await message.edit_text(
+                f'❌ <b>Kaguya:</b> Имя файла «{module_name}» зарезервировано ядром. Установка заблокирована.')
+            return
+
+        file_path = os.path.join(target_dir, f'{module_name}.py')
+        full_module_name = f'kaguya.modules.{module_name}'
+
+        temp_file_path = os.path.join(target_dir, '_temp_install.py')
+        temp_import_name = 'kaguya.modules._temp_install'
+
+        try:
+            file_io = await client.download_media(doc, in_memory=True)
+            code = file_io.getvalue().decode('utf-8')
+
+            compile(code, doc.file_name, 'exec')
+
+            warnings = check_security(code)
+            if warnings:
+                await message.edit_text(
+                    f'⚠️ <b>Kaguya | Подозрительный модуль!</b>\n\n'
+                    f'В коде файла обнаружены заблокированные вызовы: <code>{", ".join(warnings)}</code>\n'
+                    f'Этот файл может содержать вредоносный код!\n\n'
+                    f'<b>Установка заблокирована из соображений безопасности.</b>'
+                )
+                return
+
+            with open(temp_file_path, 'w', encoding='utf-8') as f:
+                f.write(code)
+
+            meta = self.client.manager.load_module(temp_import_name, temp_file_path)
+
+            self.client.unload_module_handler(temp_import_name)
+            self.client.loaded_modules.pop(temp_import_name, None)
+            sys.modules.pop(temp_import_name, None)
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
+            forbidden_meta_names = {'система', 'system', 'client', 'loader', 'core', 'ядро'}
+            if meta.name.lower() in forbidden_meta_names:
+                await message.edit_text(
+                    f'❌ <b>Kaguya:</b> Название модуля «{meta.name}» зарезервировано системой. Установка заблокирована.')
+                return
+
+            existing_full_name = None
+            existing_mod = None
+            for full_name, mod in self.client.loaded_modules.items():
+                if mod.meta.name.lower() == meta.name.lower():
+                    existing_full_name = full_name
+                    existing_mod = mod
+                    break
+
+            if existing_mod:
+                if 'core_modules' in existing_full_name:
+                    await message.edit_text(
+                        f'❌ <b>Kaguya:</b> Модуль «{meta.name}» конфликтует с системным компонентом.')
+                    return
+
+                if existing_mod.meta.author.lower() != meta.author.lower():
+                    await message.edit_text(
+                        f'❌ <b>Kaguya | Конфликт авторов</b>\n\n'
+                        f'Модуль «{meta.name}» уже установлен, но его автор — <b>{existing_mod.meta.author}</b>.\n'
+                        f'Новый модуль написан автором <b>{meta.author}</b>.\n\n'
+                        f'Установка заблокирована во избежание перезаписи. Если хочешь заменить его, '
+                        f'сначала удали старый: <code>{client.prefixes[0]}удалить {existing_mod.meta.name}</code>'
+                    )
+                    return
+
+                await message.edit_text(f'🔄 <b>Kaguya:</b> Обновление модуля «{meta.name}» до v{meta.version}...')
+
+                old_file = getattr(sys.modules.get(existing_full_name), '__file__', None)
+                self.client.unload_module_handler(existing_full_name)
+                self.client.loaded_modules.pop(existing_full_name, None)
+                sys.modules.pop(existing_full_name, None)
+
+                if old_file and os.path.exists(old_file):
+                    os.remove(old_file)
+
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(code)
+
+            meta_final = self.client.manager.load_module(full_module_name, file_path)
+
+            p = client.prefixes[0] if getattr(client, 'prefixes', None) else '.'
+            cmds_list = []
+            for cmd_key in meta_final.commands.keys():
+                aliases = [a.strip() for a in cmd_key.split('|')]
+                formatted_aliases = ' | '.join([f'<code>{p}{alias}</code>' for alias in aliases])
+                cmds_list.append(formatted_aliases)
+
+            cmds_str = ', '.join(cmds_list) if cmds_list else 'отсутствуют'
+            await message.edit_text(
+                f'✅ <b>Модуль успешно установлен!</b>\n\n'
+                f'📦 <b>{meta_final.name}</b> <code>v{meta_final.version}</code>\n'
+                f' ├ <i>{meta_final.description}</i>\n'
+                f' └ <b>Команды:</b> {cmds_str}'
+            )
+
+        except SyntaxError as e:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+            await message.edit_text(f'❌ <b>Kaguya:</b> Модуль поврежден\n<code>{e}</code>')
+        except Exception as e:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            await message.edit_text(f'❌ <b>Kaguya:</b> Не удалось загрузить модуль\n<code>{e}</code>')
+
 
 @on_command(['unload', 'удалить'])
 async def unload_module(self, client: Client, message: Message):
