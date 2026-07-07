@@ -9,7 +9,7 @@ class SystemModule(BaseModule):
     meta = ModuleInfo(
         name='Система',
         description='Встроенные системные команды для Kaguya',
-        version='1.0.0',
+        version='1.0.1',
         author='cxvimba',
         commands={
             'modules | модули': 'Показать список всех активных модулей',

@@ -21,7 +21,7 @@ class TranslatorModule(BaseModule):
     meta = ModuleInfo(
         name='Переводчик',
         description='Переводчик текста через инлайн-ассистента',
-        version='1.0.0',
+        version='1.0.1',
         author='cxvimba',
         commands={
             'tr | перевод | translate': 'Запустить интерактивный перевод'
@@ -77,13 +77,10 @@ class TranslatorModule(BaseModule):
 
         await message.delete()
 
-    @on_assistant_inline()
+    @on_assistant_inline('tr_')
     async def translator_inline(self, client: Client, inline_query: InlineQuery):
         """Отвечает инлайн-результатом с сеткой флагов."""
         query_text = inline_query.query
-        if not query_text.startswith('tr_'):
-            return
-
         tr_key = query_text[3:]
         cache = client.db.get_category('tr_cache')
         original_text = await cache.get(tr_key)

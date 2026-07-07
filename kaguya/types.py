@@ -87,11 +87,20 @@ def on_assistant_callback(pattern: Optional[str] = None):
     return decorator
 
 
-def on_assistant_inline():
+def on_assistant_inline(pattern: str | None = None):
     """Обработчик Inline-запросов бота-ассистента."""
+    if pattern:
+        async def func(_, __, inline_query):
+            return bool(inline_query.query and inline_query.query.startswith(pattern))
+
+        custom_filter = filters.create(func)
+    else:
+        custom_filter = None
+
     def decorator(func_cb):
-        func_cb.__kaguya_assistant_inline__ = True
+        func_cb.__kaguya_assistant_inline__ = custom_filter
         return func_cb
+
     return decorator
 
 

@@ -6,7 +6,7 @@ import importlib.util
 import traceback
 import html
 from functools import wraps
-from pathlib import Path
+from pyrogram.enums import ParseMode
 from pyrogram.handlers import MessageHandler, CallbackQueryHandler, InlineQueryHandler
 from kaguya.client import KaguyaClient
 from kaguya.types import BaseModule
@@ -28,19 +28,28 @@ def create_error_catcher(func):
             if len(tb_str) > 3500:
                 tb_str = tb_str[-3500:]
 
-            tb_str = html.escape(tb_str)
+            escaped_error = html.escape(str(e))
+            escaped_traceback = html.escape(tb_str)
 
             error_text = (
                 f'❌ <b>Kaguya | Ошибка выполнения!</b>\n\n'
-                f'<b>Исключение:</b> <code>{e}</code>\n\n'
+                f'<b>Исключение:</b> <code>{escaped_error}</code>\n\n'
                 f'<b>Трассировка:</b>\n'
-                f'<pre><code class="language-python">{tb_str}</code></pre>'
+                f'<pre><code class="language-python">{escaped_traceback}</code></pre>'
             )
 
             try:
-                await message.edit_text(error_text)
+                if getattr(message, 'media', None):
+                    await message.delete()
+                    await client.send_message(
+                        chat_id=message.chat.id,
+                        text=error_text,
+                        parse_mode=ParseMode.HTML
+                    )
+                else:
+                    await message.edit_text(error_text, parse_mode=ParseMode.HTML)
             except Exception as edit_err:
-                logger.warning(f'Не удалось отправить сообщение об ошибке: {edit_err}')
+                logger.warning(f'Не удалось отправить сообщение об ошибке: {escaped_error}')
     return wrapper
 
 class ModuleManager:
@@ -115,7 +124,8 @@ class ModuleManager:
 
                         if hasattr(method, '__kaguya_assistant_inline__'):
                             wrapped_method = create_error_catcher(method)
-                            handler = InlineQueryHandler(wrapped_method)
+                            inline_filter = getattr(method, '__kaguya_assistant_inline__')
+                            handler = InlineQueryHandler(wrapped_method, inline_filter)
                             self.client.assistant.add_handler(handler)
 
                         if hasattr(method, '__kaguya_assistant_command__'):
@@ -141,7 +151,8 @@ class ModuleManager:
 
                 if hasattr(method, '__kaguya_assistant_inline__'):
                     wrapped_method = create_error_catcher(method)
-                    handler = InlineQueryHandler(wrapped_method)
+                    inline_filter = getattr(method, '__kaguya_assistant_inline__')
+                    handler = InlineQueryHandler(wrapped_method, inline_filter)
                     assistant_client.add_handler(handler)
 
                 if hasattr(method, '__kaguya_assistant_command__'):

@@ -2,7 +2,8 @@ import aiohttp
 import logging
 from pyrogram import Client
 from pyrogram.errors import BotInlineDisabled
-from pyrogram.types import Message, InlineQuery
+from pyrogram.types import Message, InlineQuery, InlineKeyboardMarkup, InlineKeyboardButton, InlineQueryResultArticle, \
+    InputTextMessageContent
 from kaguya.types import on_command, on_assistant_inline
 from kaguya.utils.prefix import get_prefix
 
@@ -106,18 +107,9 @@ async def remove_token(self, client: Client, message: Message):
     )
 
 
-@on_assistant_inline()
+@on_assistant_inline('setup_check')
 async def system_inline(self, client: Client, inline_query: InlineQuery):
     """Инлайн-обработчик для проверки привязки бота-ассистента."""
-    query_text = inline_query.query
-    if query_text != 'setup_check':
-        return
-
-    from pyrogram.types import (
-        InlineQueryResultArticle, InputTextMessageContent,
-        InlineKeyboardMarkup, InlineKeyboardButton
-    )
-
     markup = InlineKeyboardMarkup(
         [
             [InlineKeyboardButton(
