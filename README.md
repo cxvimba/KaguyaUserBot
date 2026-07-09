@@ -8,6 +8,10 @@
 
 <p style="text-align: center;">
   <b>KaguyaUserBot — an asynchronous, lightweight, modular Telegram client (UserBot) featuring parallel assistant-bot integration, dynamic "hot-loading" of custom modules, and multi-language support.</b>
+  <br><br>
+  <a href="https://github.com/cxvimba/kaguya-modules">📦 Official Modules Directory</a> •
+  <a href="#3-installation-and-deployment">📥 Installation</a> •
+  <a href="#5-module-development">🛠️ Developer Guide</a>
 </p>
 
 ---
@@ -173,7 +177,7 @@ The assistant bot outputs interactive inline keyboards, flag grids, and settings
 Upon a successful startup, you will receive a confirmation message in your **Saved Messages («me»)** indicating system readiness, along with a quick tip on changing localization via the `.lang <code_here>` command.
 
 <p style="text-align: center;">
-   <img src="assets/Kaguya_inline_guide.png" alt="BotFather Inline Guide">
+   <img src="assets/Kaguya_inline_guide_en.png" alt="BotFather Inline Guide">
 </p>
 
 ---
