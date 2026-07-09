@@ -1,3 +1,4 @@
+import os
 import aiohttp
 import logging
 from pyrogram import Client
@@ -14,27 +15,22 @@ logger = logging.getLogger('Kaguya.SystemToken')
 @on_command(['token', 'токен'])
 async def set_token(self, client: Client, message: Message):
     """Проверяет и привязывает токен ассистента."""
+    p = get_prefix(client)
     if len(message.command) < 2:
-        p = get_prefix(client)
         await message.edit_text(
-            f'⚙️ <b>Kaguya | Бот-ассистент</b>\n\n'
-            f'Для работы инлайн-функционала и кнопок тебе нужен свой бот.\n\n'
-            f'1. Зайди в @BotFather и создай бота\n'
-            f'2. В настройках бота включи <b>Inline Mode</b> (<b>ОБЯЗАТЕЛЬНО!</b>)\n'
-            f'3. В этом же меню поставь <b>Inline Feedback 100%</b>\n'
-            f'4. Скопируй токен и напиши: <code>{p}token твой_токен_бота</code>'
+            self.get_text('token_usage').format(p=p)
         )
         return
 
     token = message.command[1].strip()
-    await message.edit_text('⏳ <b>Kaguya:</b> Проверяю токен...')
+    await message.edit_text(self.get_text('token_checking'))
 
     url = f'https://api.telegram.org/bot{token}/getMe'
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(url, timeout=10) as response:
                 if response.status != 200:
-                    await message.edit_text('❌ <b>Kaguya:</b> Неверный токен! Сверься с @BotFather.')
+                    await message.edit_text(self.get_text('token_invalid'))
                     return
 
                 data = await response.json()
@@ -44,10 +40,10 @@ async def set_token(self, client: Client, message: Message):
         await settings.set('bot_token', token)
         await settings.set('bot_username', bot_username)
 
-        await message.edit_text('📥 <b>Kaguya:</b> Запуск ассистента...')
+        await message.edit_text(self.get_text('token_starting'))
         await client.start_assistant(token)
 
-        await message.edit_text('⚙️ <b>Kaguya:</b> Проверяю инлайн-функционал...')
+        await message.edit_text(self.get_text('token_checking_inline'))
 
         try:
             results = await client.get_inline_bot_results(bot_username, 'setup_check')
@@ -56,19 +52,20 @@ async def set_token(self, client: Client, message: Message):
             await settings.delete('bot_token')
             await settings.delete('bot_username')
 
-            p = get_prefix(client)
-            text = (
-                f'⚠️ <b>Kaguya | Ошибка активации</b>\n\n'
-                f'Токен верный, но у твоего ассистента @{bot_username} <b>ВЫКЛЮЧЕН инлайн-режим</b>!\n\n'
-                f'Я прикрепила для тебя простую пошаговую инструкцию на картинке. '
-                f'Как только включишь, пришли токен заново через <code>{p}token твой_токен_бота</code>!\n\n'
-                f'🔗 BotFather: @BotFather'
-            )
+            text = self.get_text('token_inline_disabled').format(bot_username=bot_username, p=p)
+
+            lang = client.get_lang()
+            local_path = f'assets/Kaguya_inline_guide_{lang}.png'
+
+            if not os.path.exists(local_path):
+                local_path = 'assets/Kaguya_inline_guide_ru.png'
+
+            cache_key = f'inline_guide_file_id_{lang}'
 
             await client.edit_media_cached(
                 message=message,
-                cache_key='inline_guide_file_id',
-                local_path='assets/Kaguya_inline_guide.png',
+                cache_key=cache_key,
+                local_path=local_path,
                 caption=text
             )
             return
@@ -81,7 +78,9 @@ async def set_token(self, client: Client, message: Message):
         await message.delete()
 
     except Exception as e:
-        await message.edit_text(f'❌ <b>Kaguya:</b> Ошибка подключения к API Telegram: <code>{e}</code>')
+        await message.edit_text(
+            self.get_text('token_api_error').format(error=e)
+        )
 
 
 @on_command(['token_rm', 'токен_удалить'])
@@ -91,20 +90,17 @@ async def remove_token(self, client: Client, message: Message):
 
     bot_token = await settings.get('bot_token')
     if not bot_token:
-        await message.edit_text('❌ <b>Kaguya:</b> Бот-ассистент и так не привязан.')
+        await message.edit_text(self.get_text('token_rm_not_bound'))
         return
 
-    await message.edit_text('🗑 <b>Kaguya:</b> Остановка ассистента...')
+    await message.edit_text(self.get_text('token_rm_stopping'))
 
     await client.stop_assistant()
 
     await settings.delete('bot_token')
     await settings.delete('bot_username')
 
-    await message.edit_text(
-        f'🗑 <b>Kaguya:</b> Бот-ассистент отвязан.\n\n'
-        f'<blockquote>Инлайн функционал выключен.</blockquote>'
-    )
+    await message.edit_text(self.get_text('token_rm_success'))
 
 
 @on_assistant_inline('setup_check')
@@ -113,7 +109,7 @@ async def system_inline(self, client: Client, inline_query: InlineQuery):
     markup = InlineKeyboardMarkup(
         [
             [InlineKeyboardButton(
-                text='👾 Перейти к боту',
+                text=self.get_text('inline_go_to_bot'),
                 url=f'https://t.me/{client.me.username}')
             ]
         ]
@@ -122,11 +118,10 @@ async def system_inline(self, client: Client, inline_query: InlineQuery):
     results = [
         InlineQueryResultArticle(
             id='setup_ok',
-            title='Kaguya | Ассистент готов!',
-            description='Отправить подтверждение успешной настройки',
+            title=self.get_text('inline_setup_ok_title'),
+            description=self.get_text('inline_setup_ok_desc'),
             input_message_content=InputTextMessageContent(
-                f'🌸 <b>Kaguya | Бот-ассистент успешно привязан!</b>\n\n'
-                f'<blockquote>Все инлайн-функции и интерактивные кнопки активны и готовы к работе.</blockquote>'
+                self.get_text('inline_setup_ok_text')
             ),
             reply_markup=markup
         )

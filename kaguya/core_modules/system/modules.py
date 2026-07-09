@@ -33,9 +33,15 @@ def check_security(code: str) -> list[str]:
 @on_command(['modules', 'модули'])
 async def list_modules(self, client: Client, message: Message):
     """Выводит список всех активных моделей."""
+    p = get_prefix(client)
     try:
         if not self.client.loaded_modules:
-            text = '⚠️ <b>Kaguya:</b> Нет загруженных модулей.'
+            await client.edit_media_cached(
+                message=message,
+                cache_key=f'modules_menu_file_id',
+                local_path='assets/Kaguya_modules.png',
+                caption=self.get_text('no_modules')
+            )
             return
 
         command_parts = message.text.split(maxsplit=1)
@@ -49,16 +55,20 @@ async def list_modules(self, client: Client, message: Message):
                     break
 
             if not found_mod:
-                text = f'❌ <b>Kaguya:</b> Модуль «{target_name}» не найден.'
+                await client.edit_media_cached(
+                    message=message,
+                    cache_key=f'modules_menu_file_id',
+                    local_path='assets/Kaguya_modules.png',
+                    caption=self.get_text('module_not_found').format(target_name=target_name)
+                )
                 return
 
             text = f'📦 <b>{found_mod.meta.name}</b> <code>v{found_mod.meta.version}</code>\n'
             text += f' ├ <i>{found_mod.meta.description}</i>\n'
             if found_mod.meta.author and found_mod.meta.author != 'Anonymous':
-                text += f' ├ <b>Автор:</b> {found_mod.meta.author}\n'
+                text += f' ├ <b>{self.get_text("author")}:</b> {found_mod.meta.author}\n'
 
             if found_mod.meta.commands:
-                p = get_prefix(client)
                 cmds_list = []
 
                 for cmd_key, desc in found_mod.meta.commands.items():
@@ -66,29 +76,65 @@ async def list_modules(self, client: Client, message: Message):
                     formatted_aliases = ' | '.join([f'<code>{p}{alias}</code>' for alias in aliases])
                     cmds_list.append(f'<blockquote>{formatted_aliases} — {desc}</blockquote>')
 
-                text += ' └ <b>Команды:</b>\n' + '\n'.join(cmds_list)
+                text += f' └ <b>{self.get_text("commands")}:</b>\n' + '\n'.join(cmds_list)
             else:
-                text += ' └ <b>Команды:</b> отсутствуют'
+                text += f' └ <b>{self.get_text("commands")}:</b> {self.get_text("none")}'
+
             return
 
         count = len(self.client.loaded_modules)
-        text = f'⚡️ <b>Kaguya UserBot</b> | 🌟 Модули: <code>{count}</code>\n\n'
+        header = self.get_text('modules_header').format(count=count)
+        footer = self.get_text('modules_footer').format(p=p)
 
-        for idx, (path, mod) in enumerate(reversed(self.client.loaded_modules.items()), 1):
-            text += f'{idx}. 📦 <b>{mod.meta.name}</b> <code>v{mod.meta.version}</code>\n'
+        module_strings = []
+        for idx, (path, mod) in enumerate(reversed(client.loaded_modules.items()), 1):
+            mod_str = f'{idx}. 📦 <b>{mod.meta.name}</b> <code>v{mod.meta.version}</code>\n'
             if mod.meta.author and mod.meta.author != 'Anonymous':
-                text += f' └ <b>Автор:</b> {mod.meta.author}\n'
-            text += '\n'
-        p = get_prefix(client)
-        text += f'<blockquote>💡 Узнать больше о модуле: <code>{p}modules Модуль</code></blockquote>'
+                mod_str += f' └ <b>{self.get_text("author")}:</b> {mod.meta.author}\n'
+            mod_str += '\n'
+            module_strings.append(mod_str)
 
-    finally:
-        await client.edit_media_cached(
+        chunks = []
+        current_chunk = header
+
+        first_chunk_limit = 1000
+        subsequent_chunk_limit = 4000
+
+        is_first = True
+        for mod_str in module_strings:
+            limit = first_chunk_limit if is_first else subsequent_chunk_limit
+
+            if len(current_chunk) + len(mod_str) > limit:
+                chunks.append(current_chunk)
+                current_chunk = mod_str
+                is_first = False
+            else:
+                current_chunk += mod_str
+
+        chunks.append(current_chunk)
+
+        last_limit = first_chunk_limit if len(chunks) == 1 else subsequent_chunk_limit
+        if len(chunks[-1]) + len(footer) <= last_limit:
+            chunks[-1] += footer
+        else:
+            chunks.append(footer)
+
+        last_msg = await client.edit_media_cached(
             message=message,
-            cache_key='modules_menu_file_id',
+            cache_key=f'modules_menu_file_id',
             local_path='assets/Kaguya_modules.png',
-            caption=text
+            caption=chunks[0]
         )
+
+        for chunk in chunks[1:]:
+            last_msg = await client.send_message(
+                chat_id=message.chat.id,
+                text=chunk,
+                reply_to_message_id=last_msg.id
+            )
+    except Exception as e:
+        logger.error(f'Ошибка вывода списка модулей: {e}', exc_info=True)
+        raise e
 
 
 @on_command(['install', 'установить'])
@@ -100,16 +146,15 @@ async def install_module(self, client: Client, message: Message):
     reply = message.reply_to_message
 
     if not reply or not reply.document:
-        await message.edit_text('❌ <b>Kaguya:</b> Ответь этой командой на файл модуля (.py, .txt или .zip).')
+        await message.edit_text(self.get_text('install_reply_to'))
         return
 
     doc = reply.document
     if not doc.file_name.endswith(('.py', '.txt', '.zip')):
-        await message.edit_text(
-            '❌ <b>Kaguya:</b> Поддерживаются только файлы <code>.py</code>, <code>.txt</code> или <code>.zip</code>.')
+        await message.edit_text(self.get_text('install_supported_formats'))
         return
 
-    await message.edit_text('📥 <b>Kaguya:</b> Скачиваю и проверяю модуль...')
+    await message.edit_text(self.get_text('install_downloading'))
 
     target_dir = 'kaguya/modules'
     forbidden_filenames = {'system', 'client', 'loader', 'types', 'main', 'fsm', 'config'}
@@ -140,7 +185,9 @@ async def install_module(self, client: Client, message: Message):
         except Exception as e:
             if os.path.exists(temp_zip_dir):
                 shutil.rmtree(temp_zip_dir)
-            await message.edit_text(f'❌ <b>Kaguya:</b> Поврежденный или опасный ZIP-архив: <code>{e}</code>')
+            await message.edit_text(
+                self.get_text('install_damaged_zip').format(error=e)
+            )
             return
 
         # Распознание структуры папки внутри архива
@@ -159,18 +206,16 @@ async def install_module(self, client: Client, message: Message):
                 temp_file_path = os.path.join(temp_zip_dir, nested_folder, '__init__.py')
             else:
                 shutil.rmtree(temp_zip_dir)
-                await message.edit_text(
-                    '❌ <b>Kaguya:</b> Внутри ZIP-архива не найден файл <code>__init__.py</code>.')
+                await message.edit_text(self.get_text('install_missing_init'))
                 return
         else:
             shutil.rmtree(temp_zip_dir)
-            await message.edit_text(
-                '❌ <b>Kaguya:</b> Неверная структура архива. Ожидалась папка с <code>__init__.py</code>.')
+            await message.edit_text(self.get_text('install_invalid_structure'))
             return
 
         if module_name.lower() in forbidden_filenames:
             shutil.rmtree(temp_zip_dir)
-            await message.edit_text(f'❌ <b>Kaguya:</b> Имя модуля «{module_name}» зарезервировано системой.')
+            await message.edit_text(self.get_text('install_reserved_name').format(module_name=module_name))
             return
 
         temp_import_name = 'kaguya.modules._temp_zip_install'
@@ -186,10 +231,7 @@ async def install_module(self, client: Client, message: Message):
             if warnings:
                 shutil.rmtree(temp_zip_dir)
                 await message.edit_text(
-                    f'⚠️ <b>Kaguya | Подозрительный модуль!</b>\n\n'
-                    f'В коде пакета обнаружены заблокированные вызовы: <code>{", ".join(warnings)}</code>\n'
-                    f'Этот архив может содержать вредоносный код!\n\n'
-                    f'<b>Установка заблокирована из соображений безопасности.</b>'
+                    self.get_text('install_suspicious_code').format(warnings=', '.join(warnings))
                 )
                 return
 
@@ -201,7 +243,9 @@ async def install_module(self, client: Client, message: Message):
             forbidden_meta_names = {'система', 'system', 'client', 'loader', 'core', 'ядро'}
             if meta.name.lower() in forbidden_meta_names:
                 shutil.rmtree(temp_zip_dir)
-                await message.edit_text(f'❌ <b>Kaguya:</b> Название «{meta.name}» зарезервировано системой.')
+                await message.edit_text(
+                    self.get_text('install_reserved_name').format(module_name=meta.name)
+                )
                 return
 
             # Поиск дубликата имени модуля
@@ -216,23 +260,28 @@ async def install_module(self, client: Client, message: Message):
             if existing_mod:
                 if 'core_modules' in existing_full_name:
                     shutil.rmtree(temp_zip_dir)
-                    await message.edit_text(f'❌ <b>Kaguya:</b> Модуль «{meta.name}» конфликтует с системой.')
+                    await message.edit_text(
+                        self.get_text('install_reserved_name').format(module_name=meta.name)
+                    )
                     return
 
                 # Защита от перезаписи разных авторов
                 if existing_mod.meta.author.lower() != meta.author.lower():
                     shutil.rmtree(temp_zip_dir)
                     await message.edit_text(
-                        f'❌ <b>Kaguya | Конфликт авторов</b>\n\n'
-                        f'Модуль «{meta.name}» уже установлен, но его автор — <b>{existing_mod.meta.author}</b>.\n'
-                        f'Новый модуль написан автором <b>{meta.author}</b>.\n\n'
-                        f'Установка заблокирована во избежание перезаписи. Если хочешь заменить его, '
-                        f'сначала удали старый: <code>{client.prefixes[0]}удалить {existing_mod.meta.name}</code>'
+                        self.get_text("install_author_conflict").format(
+                            name=meta.name,
+                            old_author=existing_mod.meta.author,
+                            new_author=meta.author,
+                            p=client.prefixes[0]
                         )
+                    )
                     return
 
                 # Обновление модуля
-                await message.edit_text(f'🔄 <b>Kaguya:</b> Обновление модуля «{meta.name}» до v{meta.version}...')
+                await message.edit_text(
+                    self.get_text('install_updating').format(name=meta.name, version=meta.version)
+                )
                 old_file = getattr(sys.modules.get(existing_full_name), '__file__', None)
                 self.client.unload_module_handler(existing_full_name)
                 self.client.loaded_modules.pop(existing_full_name, None)
@@ -269,10 +318,12 @@ async def install_module(self, client: Client, message: Message):
                 shutil.rmtree(backup_dir)
 
             await message.edit_text(
-                f'✅ <b>Модуль-пакет успешно установлен!</b>\n\n'
-                f'📦 <b>{meta_final.name}</b> <code>v{meta_final.version}</code>\n'
-                f' ├ <i>{meta_final.description}</i>\n'
-                f' └ Папка модуля: <code>kaguya/modules/{module_name}</code>'
+                self.get_text('install_success_package').format(
+                    name=meta_final.name,
+                    version=meta_final.version,
+                    description=meta_final.description,
+                    module_name=module_name
+                )
             )
 
         except Exception as load_error:
@@ -296,8 +347,8 @@ async def install_module(self, client: Client, message: Message):
 
         if module_name.lower() in forbidden_filenames:
             await message.edit_text(
-                f'❌ <b>Kaguya:</b> Имя файла «{module_name}» зарезервировано ядром. Установка заблокирована.')
-            return
+                self.get_text('install_reserved_name').format(module_name=module_name)
+            )
 
         file_path = os.path.join(target_dir, f'{module_name}.py')
         full_module_name = f'kaguya.modules.{module_name}'
@@ -314,10 +365,7 @@ async def install_module(self, client: Client, message: Message):
             warnings = check_security(code)
             if warnings:
                 await message.edit_text(
-                    f'⚠️ <b>Kaguya | Подозрительный модуль!</b>\n\n'
-                    f'В коде файла обнаружены заблокированные вызовы: <code>{", ".join(warnings)}</code>\n'
-                    f'Этот файл может содержать вредоносный код!\n\n'
-                    f'<b>Установка заблокирована из соображений безопасности.</b>'
+                    self.get_text('install_suspicious_code').format(warnings=', '.join(warnings))
                 )
                 return
 
@@ -335,7 +383,8 @@ async def install_module(self, client: Client, message: Message):
             forbidden_meta_names = {'система', 'system', 'client', 'loader', 'core', 'ядро'}
             if meta.name.lower() in forbidden_meta_names:
                 await message.edit_text(
-                    f'❌ <b>Kaguya:</b> Название модуля «{meta.name}» зарезервировано системой. Установка заблокирована.')
+                    self.get_text('install_reserved_name').format(module_name=meta.name)
+                )
                 return
 
             existing_full_name = None
@@ -349,20 +398,24 @@ async def install_module(self, client: Client, message: Message):
             if existing_mod:
                 if 'core_modules' in existing_full_name:
                     await message.edit_text(
-                        f'❌ <b>Kaguya:</b> Модуль «{meta.name}» конфликтует с системным компонентом.')
+                        self.get_text('install_reserved_name').format(module_name=meta.name)
+                    )
                     return
 
                 if existing_mod.meta.author.lower() != meta.author.lower():
                     await message.edit_text(
-                        f'❌ <b>Kaguya | Конфликт авторов</b>\n\n'
-                        f'Модуль «{meta.name}» уже установлен, но его автор — <b>{existing_mod.meta.author}</b>.\n'
-                        f'Новый модуль написан автором <b>{meta.author}</b>.\n\n'
-                        f'Установка заблокирована во избежание перезаписи. Если хочешь заменить его, '
-                        f'сначала удали старый: <code>{client.prefixes[0]}удалить {existing_mod.meta.name}</code>'
+                        self.get_text('install_author_conflict').format(
+                            name=meta.name,
+                            old_author=existing_mod.meta.author,
+                            new_author=meta.author,
+                            p=client.prefixes[0]
+                        )
                     )
                     return
 
-                await message.edit_text(f'🔄 <b>Kaguya:</b> Обновление модуля «{meta.name}» до v{meta.version}...')
+                await message.edit_text(
+                    self.get_text('install_updating').format(name=meta.name, version=meta.version)
+                )
 
                 old_file = getattr(sys.modules.get(existing_full_name), '__file__', None)
                 self.client.unload_module_handler(existing_full_name)
@@ -384,24 +437,30 @@ async def install_module(self, client: Client, message: Message):
                 formatted_aliases = ' | '.join([f'<code>{p}{alias}</code>' for alias in aliases])
                 cmds_list.append(formatted_aliases)
 
-            cmds_str = ', '.join(cmds_list) if cmds_list else 'отсутствуют'
+            cmds_str = ', '.join(cmds_list) if cmds_list else self.get_text('none')
             await message.edit_text(
-                f'✅ <b>Модуль успешно установлен!</b>\n\n'
-                f'📦 <b>{meta_final.name}</b> <code>v{meta_final.version}</code>\n'
-                f' ├ <i>{meta_final.description}</i>\n'
-                f' └ <b>Команды:</b> {cmds_str}'
+                self.get_text('install_success_single').format(
+                    name=meta_final.name,
+                    version=meta_final.version,
+                    description=meta_final.description,
+                    cmds=cmds_str
+                )
             )
 
         except SyntaxError as e:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
-            await message.edit_text(f'❌ <b>Kaguya:</b> Модуль поврежден\n<code>{e}</code>')
+            await message.edit_text(
+                self.get_text('install_damaged_syntax').format(error=e)
+            )
         except Exception as e:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
             if os.path.exists(file_path):
                 os.remove(file_path)
-            await message.edit_text(f'❌ <b>Kaguya:</b> Не удалось загрузить модуль\n<code>{e}</code>')
+            await message.edit_text(
+                self.get_text('install_failed').format(error=e)
+            )
 
 
 @on_command(['unload', 'удалить'])
@@ -409,7 +468,7 @@ async def unload_module(self, client: Client, message: Message):
     """Удаляет пользовательский модуль."""
     command_parts = message.text.split(maxsplit=1)
     if len(command_parts) < 2:
-        await message.edit_text('❌ <b>Kaguya:</b> Укажи имя модуля. Пример: <code>.unload Модуль</code>')
+        await message.edit_text(self.get_text('unload_usage'))
         return
 
     target_name = command_parts[1].strip()
@@ -424,11 +483,13 @@ async def unload_module(self, client: Client, message: Message):
             break
 
     if not found_mod_instance:
-        await message.edit_text(f'❌ <b>Kaguya:</b> Модуль с именем «{target_name}» не найден.')
+        await message.edit_text(
+            self.get_text('unload_not_found').format(target_name=target_name)
+        )
         return
 
     if 'core_modules' in found_full_import_name:
-        await message.edit_text('❌ <b>Kaguya:</b> Нельзя удалять системные модули ядра.')
+        await message.edit_text(self.get_text('unload_core_protected'))
         return
 
     try:
@@ -439,7 +500,7 @@ async def unload_module(self, client: Client, message: Message):
             abs_safe_dir = os.path.abspath('kaguya/modules')
 
             if 'core_modules' in abs_module_path or 'client.py' in abs_module_path:
-                await message.edit_text('❌ <b>Kaguya:</b> Нельзя удалять системные модули ядра.')
+                await message.edit_text(self.get_text('unload_core_protected'))
                 return
 
             if abs_module_path.startswith(abs_safe_dir):
@@ -458,7 +519,10 @@ async def unload_module(self, client: Client, message: Message):
         sys.modules.pop(found_full_import_name, None)
 
         await message.edit_text(
-            f'🗑 <b>Kaguya:</b> Модуль «{found_mod_instance.meta.name}» успешно удален.')
+            self.get_text('unload_success').format(name=found_mod_instance.meta.name)
+        )
 
     except Exception as e:
-        await message.edit_text(f'❌ <b>Kaguya:</b> Ошибка при удалении модуля:\n<i>{e}</i>')
+        await message.edit_text(
+            self.get_text('unload_error').format(error=e)
+        )

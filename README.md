@@ -1,138 +1,136 @@
+<p align="right">
+  <a href="README.ru.md">🇷🇺 Перейти на русскую версию</a>
+</p>
+
 <p style="text-align: center;">
   <img src="assets/Kaguya_main.png" alt="Kaguya UserBot Cover">
 </p>
 
 <p style="text-align: center;">
-  <b>KaguyaUserBot — асинхронный, легковесный модульный Telegram-клиент (ЮзерБот) с параллельной интеграцией бота-ассистента и динамической песочницей для плагинов.</b>
+  <b>KaguyaUserBot — an asynchronous, lightweight, modular Telegram client (UserBot) featuring parallel assistant-bot integration, dynamic "hot-loading" of custom modules, and multi-language support.</b>
 </p>
 
 ---
 
-## 1. Описание проекта и архитектура
+## 1. Project Description and Architecture
 
-**KaguyaUserBot** — это событийно-ориентированный фреймворк, построенный на базе библиотеки `kurigram` (высокопроизводительного форка `pyrogram`). Основная задача проекта — предоставить разработчикам и пользователям гибкую и изолированную среду для запуска юзерботов без необходимости развертывания тяжелых СУБД.
+**KaguyaUserBot** is an event-driven framework built on top of the `kurigram` library (a high-performance and actively maintained fork of `pyrogram`). The main goal of the project is to provide developers and users with a flexible, lightweight environment to run userbots and automate daily tasks without the need to deploy heavy external database management systems (DBMS).
 
-### Ключевые архитектурные особенности:
+### Key Architectural Features:
 
-* **Архитектура микроядра:** Основной клиент `KaguyaClient` выполняет роль легковесного ядра. Он отвечает за авторизацию, чтение глобальных настроек, поддержание сессии и маршрутизацию событий. Вся прикладная логика вынесена в изолированные динамические модули.
-* **Гибридный режим работы:** Внутри одного Event Loop одновременно работают два клиента: юзербот (через MTProto) и бот-ассистент (через Bot API). Они взаимодействуют через общую базу данных и вызывают функции друг друга — это позволяет корректно работать инлайн-функционалу в чатах.
-* **Общая локальная БД:** Вместо тяжелых серверов используется встроенная Key-Value БД на базе оптимизированного SQLite с асинхронной оберткой (`asyncio.to_thread`). Она автоматически удаляет устаревшие записи (через TTL) и позволяет удобно разделять данные по категориям.
-* **Мгновенное кэширование медиа:** Для экономии трафика и ускорения рендеринга меню бот использует метод `edit_media_cached`. При первой отправке обложки с диска полученный от серверов Telegram `file_id` кэшируется. Все последующие вызовы меню используют этот ID, что позволяет быстро обновлять медиа.
+* **Microkernel Architecture:** The core client `KaguyaClient` acts as a lightweight kernel. It is solely responsible for authentication, reading global settings, session maintenance, and event routing. All application logic is offloaded to decoupled, dynamic modules that can be loaded and unloaded on the fly.
+* **Hybrid Operation Mode:** Two clients run concurrently within a single Event Loop: the userbot (via MTProto) and the assistant bot (via Telegram Bot API). They interact through a shared database and complement each other, allowing for interactive inline menus and buttons in any chat.
+* **Shared Local Database:** Instead of deploying heavy external database servers, the project utilizes an embedded Key-Value store based on the `diskcache` library (running on top of optimized SQLite with an asynchronous wrapper via `asyncio.to_thread`). The database supports TTL (Time-To-Live) for automatic expiration and category-based data isolation.
+* **Internationalization (i18n):** The userbot is equipped with a fast localization system (ISO 639-1 standard). The active system language is cached in the client's RAM (`client.get_lang()`), allowing modules to translate their interface on the fly without any disk-read latency or database overhead.
+* **Media Resource Caching:** To conserve network bandwidth and prevent `Flood Wait` issues, the project employs the `edit_media_cached` method. Upon sending an interface media file from disk for the first time, the `file_id` received from Telegram servers is cached. All subsequent calls to this menu utilize the cached `file_id`, ensuring near-instant rendering.
 
 ---
 
-## 2. Дисклеймер
+## 2. Disclaimer
 
-> **ВНИМАНИЕ:** Запуск юзерботов нарушает официальные Правила предоставления услуг Telegram ([Terms of Service](https://telegram.org/tos/?setln=ru)), так как автоматизирует действия в аккаунте через MTProto API. 
+> **WARNING:** Running userbots violates the official Telegram Terms of Service ([Terms of Service](https://telegram.org/tos/?setln=en)), as it automates account actions via the MTProto API. 
 > 
-> * Автор проекта **не несет ответственности** за возможные блокировки или ограничения вашего аккаунта со стороны антиспам-алгоритмов Telegram.
-> * Клиент Kaguya мимикрирует под официальный Windows Desktop клиент, чтобы минимизировать риски обнаружения, однако полная безопасность не гарантируется.
-> * **Безопасность модулей:** Устанавливаемые модули выполняются в том же процессе, что и ядро, и имеют полный доступ к вашим файлам сессий (`.session`) и переменным окружения. Устанавливайте модули только из доверенных источников!
+> * The project author **is not responsible** for any potential blocks or restrictions placed on your account by Telegram's anti-spam algorithms.
+> * The Kaguya client mimics the official Windows Desktop client to minimize detection risks; however, complete safety cannot be guaranteed.
+> * **Module Security:** Installed modules run within the same process as the core client and have full access to your session files (`.session`) and environment variables. Only install modules from trusted sources!
 
 ---
 
-## 3. Установка и развертывание
+## 3. Installation and Deployment
 
-### Подготовка ключей
-Для работы MTProto-клиента необходимо получить ключи API в Telegram:
-1. Авторизуйтесь на сайте [my.telegram.org](https://my.telegram.org/).
-2. Перейдите в раздел **API Development Tools** и создайте новое приложение.
-3. Сохраните полученные значения параметров `API_ID` и `API_HASH`.
+### Getting API Keys
+To run an MTProto client, you must obtain API keys from Telegram:
+1. Log in to [my.telegram.org](https://my.telegram.org/).
+2. Navigate to **API Development Tools** and create a new application.
+3. Save your `API_ID` and `API_HASH` values.
 
 ---
 
-### Запуск на Windows
+### Running on Windows
 
-Проект содержит готовый сценарий автоматического развертывания виртуального окружения `venv` и установки зависимостей в один клик.
+The project features an automated bootstrap script that sets up a Python virtual environment (`venv`) and installs all dependencies in one click.
 
-1. Установите [Python 3.11 или выше](https://www.python.org/downloads/) (при установке обязательно отметьте флаг **«Add Python to PATH»**).
-2. Скачайте архив репозитория KaguyaUserBot и распакуйте его.
-3. Запустите файл `[Windows]Kaguya_run.bat`.
-4. Скрипт проверит окружение, установит зависимости и автоматически создаст пустой файл конфигурации `.env` в корне проекта.
-5. Откройте файл `.env` в Блокноте и впишите туда свои ключи:
+1. Install [Python 3.11 or higher](https://www.python.org/downloads/) (make sure to check **"Add Python to PATH"** during installation).
+2. Download and unpack the KaguyaUserBot repository.
+3. Run `[Windows]Kaguya_run.bat`.
+4. The script will verify your environment, install dependencies, and automatically generate an empty `.env` configuration file in the project root (a template is also available in `.env.example`).
+5. Open `.env` in Notepad and insert your keys:
    ```env
-   API_ID=ваш_api_id
-   API_HASH=ваш_api_hash
+   API_ID=your_api_id
+   API_HASH=your_api_hash
    ```
-6. Сохраните файл и запустите [Windows]Kaguya_run.bat заново. Введите ваш номер телефона и код подтверждения из Telegram для создания сессии. 
-    * **Примечание по компиляции:** Библиотека ускорения шифрования tgcrypto требует компилятор C++ для сборки из исходников. Наш загрузчик `[Windows]Kaguya_run.bat` автоматически распознает ошибки компиляции, пропустит их и запустит бота на встроенных средствах шифрования Python без необходимости ставить компиляторы.
+6. Save the file and run `[Windows]Kaguya_run.bat` again. Enter your phone number and the Telegram confirmation code to establish a session.
+    * **Note on compilation:** The `tgcrypto` encryption acceleration library requires a C++ compiler to build from source on Windows. Our launcher `[Windows]Kaguya_run.bat` automatically catches compilation errors, skips them, and runs the bot using Python's built-in cryptographic fallbacks seamlessly.
 
 ---
 
-### Запуск на Android
+### Running on Android
 
-Для работы юзербота на смартфонах используется эмулятор терминала Termux.
+To run the userbot on smartphones, the Termux terminal emulator is used.
 
-1. Установите приложение Termux (рекомендуется сборка из F-Droid).
-2. Запустите Termux и выполните команду для автоматической инициализации проекта:
+1. Install the Termux application (the F-Droid build is highly recommended).
+2. Launch Termux and execute the command for automated project initialization:
    ```Bash
    bash [Termux]Kaguya_run.sh
    ```
-3. Скрипт самостоятельно установит пакеты `python`, `git`, развернет окружение и запустит установку библиотек построчно.
-4. Скопируйте шаблон `.env.example` в рабочий файл настроек: 
+3. The script will automatically install `python`, `git`, configure the virtual environment, and install dependencies.
+4. Copy the environment configuration template:
    ```Bash
    cp .env.example .env
    ```
-5. Настройте ключи `API_ID` и `API_HASH` внутри `.env` и запустите скрипт заново для авторизации.
+5. Open `.env` in a built-in terminal editor (e.g., `nano .env`), configure your `API_ID` and `API_HASH`, then run the script again to authenticate.
 
 ---
 
-### Запуск на Ubuntu
+### Running on Ubuntu
 
-**Шаг 1. Подготовка сервера**
+**Step 1. Prepare Server**
 
-Подключись к своему VPS по SSH и установи необходимые системные пакеты:
+Connect to your VPS via SSH and install the required system packages:
 ```Bash
 sudo apt update && sudo apt upgrade -y
 sudo apt install python3 python3-venv python3-pip git nano -y
 ```
 
-**Шаг 2. Клонирование и настройка проекта**
+**Step 2. Clone and Setup Project**
 
 ```Bash
 git clone https://github.com/cxvimba/KaguyaUserBot.git
 cd KaguyaUserBot
 ```
 
-Создай виртуальное окружение, активируй его и установи библиотеки:
-
+Create a virtual environment, activate it, and install dependencies:
 ```Bash
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Скопируй шаблон настроек в рабочий файл конфигурации:
-
+Copy the environment configuration template:
 ```Bash
 cp .env.example .env
 nano .env
 ```
+Type your `API_ID` and `API_HASH` in the opened nano text editor, save changes (`Ctrl+O` ➔ `Enter`), and exit via `Ctrl+X`.
 
-Впиши свои `API_ID` и `API_HASH` в открывшемся текстовом редакторе nano, сохрани изменения нажатием `Ctrl+O` ➔ `Enter`, а затем выйди через `Ctrl+X`.
+**Step 3. Initial Launch and Authorization**
 
-**Шаг 3. Первый запуск и авторизация**
-
-Запусти скрипт вручную один раз, чтобы пройти авторизацию в Telegram и сгенерировать файл сессии:
-
+Run the script manually once to complete authorization and generate a session file:
 ```Bash
 python3 main.py
 ```
+Enter your phone number and the Telegram verification code. Once Kaguya indicates that it has successfully started, stop it by pressing `Ctrl + C`.
 
-Введи свой номер телефона и код подтверждения из Telegram. Как только Kaguya напишет, что успешно запущена — останови её комбинацией клавиш `Ctrl + C`.
+**Step 4. Configure 24/7 Autostart via Systemd (Recommended)**
 
-**Шаг 4. Настройка автозапуска 24/7 через Systemd (Рекомендуется)**
+To ensure the bot runs persistently in the background and restarts automatically on server reboot, configure a systemd service.
 
-Чтобы бот работал в фоновом режиме, не выключался при закрытии консоли и сам поднимался при перезагрузке сервера, настроим системную службу.
-
-Создай файл службы:
-
+Create the service file:
 ```Bash
 sudo nano /etc/systemd/system/kaguya.service
 ```
 
-Вставь туда следующий шаблон (замени `/root/KaguyaUserBot` на твой реальный путь к проекту, если он отличается):
-
+Insert the following template (replace `/root/KaguyaUserBot` with your actual project directory path, if different):
 ```Ini
 [Unit]
 Description=Kaguya UserBot Service
@@ -149,8 +147,7 @@ RestartSec=10
 WantedBy=multi-user.target
 ```
 
-Сохрани файл (`Ctrl+O` ➔ `Enter` ➔ `Ctrl+X`). Теперь активируй и запусти службу:
-
+Save the file (`Ctrl+O` ➔ `Enter` ➔ `Ctrl+X`). Activate and start the service:
 ```Bash
 sudo systemctl daemon-reload
 sudo systemctl enable kaguya.service
@@ -159,19 +156,21 @@ sudo systemctl start kaguya.service
 
 ---
 
-## 4. Интеграция бота-ассистента
+## 4. Helper Bot Integration
 
-Бот-ассистент обеспечивает вывод интерактивных клавиатур флагов и меню настроек.
+The assistant bot outputs interactive inline keyboards, flag grids, and settings menus.
 
-1. Перейдите в чат с официальным ботом [@BotFather](https://t.me/BotFather) и создайте нового бота (`/newbot`).
-2. В меню настроек вашего нового бота перейдите в `Bot Settings ➔ Inline Mode` и включите его.
-3. Там же перейдите в `Inline Feedback` и выберите значение `100%` (обязательно для корректной работы Inline).
-4. Напишите вашему юзерботу команду привязки:
+1. Go to the official [@BotFather](https://t.me/BotFather) bot in Telegram and create a new bot (`/newbot`).
+2. In your bot settings, navigate to `Bot Settings ➔ Inline Mode` and enable it.
+3. In the same menu, go to `Inline Feedback` and select `100%` (required for proper Inline callback operation).
+4. Send the bind command to your running userbot in any chat:
    ```
-   .токен <ваш_токен_из_BotFather>
+   .token <your_BotFather_token>
    ```
-5. Валидация на лету: Юзербот мгновенно запустит ассистента в фоне, отправит скрытый инлайн-запрос для проверки активности инлайн-режима и привяжет его к ядру.
-   * Если инлайн-режим не был включен в BotFather, бот-помощник автоматически остановится, сотрет токен из базы во избежание сбоев и выведет в чат подробную пошаговую инфографику по исправлению проблемы.
+5. On-the-fly validation: The userbot will instantly launch the assistant in the background, send a hidden inline query to verify inline mode activity, and bind it to the core.
+   * If inline mode is disabled in BotFather, the assistant bot will automatically stop, wipe the token from the database, and display a detailed graphic guide on how to fix the issue.
+
+Upon a successful startup, you will receive a confirmation message in your **Saved Messages («me»)** indicating system readiness, along with a quick tip on changing localization via the `.lang <code_here>` command.
 
 <p style="text-align: center;">
    <img src="assets/Kaguya_inline_guide.png" alt="BotFather Inline Guide">
@@ -179,80 +178,89 @@ sudo systemctl start kaguya.service
 
 ---
 
-## 5. Разработка модулей
+## 5. Module Development
 
-Фреймворк Kaguya поддерживает два формата модулей в папке kaguya/modules/:
-1. **Одиночные .py файлы** (простые утилиты). 
-2. **Папки-пакеты** (сложные модули с собственными ассетами, конфигами и подмодулями), содержащие на входе файл инициализации `__init__.py`.
+The Kaguya framework supports two module formats in the `kaguya/modules/` directory:
+1. **Single-file modules** (simple `.py` scripts).
+2. **Package modules** (complex modules with assets, configs, and submodules), containing an entry-point `__init__.py` file.
 
 ---
 
-### Архитектура одиночного модуля
+### Architecture of a Multi-Language Plugin (Single File)
 
-Любой модуль должен содержать класс, унаследованный от `BaseModule`.
+To support multilingual localization and enable proper IDE integration (autocomplete hints in PyCharm Pro), any module should inherit from `BaseModule`, declare a class-level `LANGUAGES` dictionary, and use strict type hints.
 
 ```Python
-class Ping(BaseModule):
+from pyrogram import Client
+from pyrogram.types import Message
+from kaguya.types import BaseModule, ModuleInfo, on_command
+from typing import TYPE_CHECKING
+
+# Circular import protection and PyCharm Pro autocomplete activation
+if TYPE_CHECKING:
+    from kaguya.client import KaguyaClient
+
+class AutoReply(BaseModule):
     meta = ModuleInfo(
-        name="Автоответчик",
-        description="Сохраняет и выводит автоматические ответы в чатах",
-        version="1.0.0",
+        name="Auto-Responder",
+        description="Saves and automatically outputs replies in chat",
+        version="1.1.0",
         author="cxvimba",
         commands={
-            "set_reply | задать_ответ": "Сохранить автоответ (формат: .set_reply слово | ответ)",
-            "reply_list | ответы": "Показать все сохраненные ответы"
+            "set_reply | задать_ответ": "Save auto-reply (format: .set_reply word | response)"
         }
     )
 
+    # Localization dictionary.
+    # The first language in the dict (in this case, "en") automatically becomes
+    # the default fallback if the user selects a language unsupported by this plugin.
+    LANGUAGES = {
+        "en": {
+            "usage": "❌ **Kaguya:** Format: `.set_reply trigger | reply text`",
+            "separator": "❌ **Kaguya:** Split trigger and reply using `|`",
+            "success": "✅ **Kaguya:** Auto-reply for «{trigger}» successfully saved!"
+        },
+        "ru": {
+            "usage": "❌ **Kaguya:** Формат: `.set_reply триггер | текст ответа`",
+            "separator": "❌ **Kaguya:** Разделяй триггер и ответ символом `|`",
+            "success": "✅ **Kaguya:** Автоответ на слово «{trigger}» успешно сохранен!"
+        }
+    }
+
     @on_command(["set_reply", "задать_ответ"])
-    async def set_reply_cmd(self, client: Client, message: Message):
-        """Парсит аргументы и сохраняет автоответ в базу данных."""
+    async def set_reply_cmd(self, client: "KaguyaClient", message: Message):
+        """Parses arguments and saves auto-reply into the local database."""
         if len(message.command) < 2:
-            await message.edit_text("❌ **Kaguya:** Формат: `.set_reply триггер | текст ответа`")
+            # Synchronously fetch the localized string via BaseModule's get_text helper
+            await message.edit_text(self.get_text("usage"))
             return
 
-        # Извлекаем текст после команды
         raw_text = message.text.split(maxsplit=1)[1]
         if "|" not in raw_text:
-            await message.edit_text("❌ **Kaguya:** Разделяй триггер и ответ символом `|`")
+            await message.edit_text(self.get_text("separator"))
             return
 
         trigger, reply_text = map(str.strip, raw_text.split("|", 1))
 
-        # Подключаемся к категории "auto_responses" в нашей локальной БД diskcache
+        # Access diskcache-backed SQLite local DB through categories
         db = self.client.db.get_category("auto_responses")
-        
-        # Сохраняем связку в базу
         await db.set(trigger.lower(), reply_text)
-        await message.edit_text(f"✅ **Kaguya:** Автоответ на слово «{trigger}» успешно сохранен!")
+        
+        # Display formatted output with automatic translation lookup
+        await message.edit_text(self.get_text("success").format(trigger=trigger))
 ```
 
 ---
 
-### Архитектура модуля-пакета
+### Architecture of a Package Module
 
-Чтобы Kaguya распознала папку как модуль-пакет, в ней должен присутствовать `__init__.py`. Все обработчики и команды могут быть вынесены в отдельные файлы (например, commands.py), а в `__init__.py` они просто импортируются и привязываются как атрибуты класса `SystemModule`:
+For Kaguya to recognize a directory as a package module, an `__init__.py` file must be present inside it. All handlers and command logic can be split into separate files (e.g., `commands.py`) and then imported and bound as class attributes in `__init__.py`:
 
 ```Python
 # kaguya/core_modules/system/modules.py
 @on_command(['modules', 'модули'])
 async def list_modules(self, client: Client, message: Message):
-    """Выводит список всех активных моделей."""
-    count = len(self.client.loaded_modules)
-    text = f'⚡️ <b>Kaguya UserBot</b> | 🌟 Модули: <code>{count}</code>\n\n'
-
-    for idx, (path, mod) in enumerate(reversed(self.client.loaded_modules.items()), 1):
-        text += f'{idx}. 📦 <b>{mod.meta.name}</b> <code>v{mod.meta.version}</code>\n'
-        if mod.meta.author and mod.meta.author != 'Anonymous':
-            text += f' └ <b>Автор:</b> {mod.meta.author}\n'
-        text += '\n'
-
-    await client.edit_media_cached(
-        message=message,
-        cache_key='modules_menu_file_id',
-        local_path='assets/Kaguya_modules.png',
-        caption=text
-    )
+    ...
 
 
 # kaguya/core_modules/system/__init__.py
@@ -261,47 +269,81 @@ from .modules import list_modules, install_module
     
 class SystemModule(BaseModule):
     meta = ModuleInfo(
-        name='Система',
-        description='Системные утилиты Kaguya',
-        version='1.0.0',
-        author='Anonymous',
+        name='System',
+        description='Kaguya core system utilities',
+        version='1.1.0',
+        author='cxvimba',
         commands={
-           'modules': 'Список модулей',
-           'install': 'Установить модуль'
+           'modules': 'Module list',
+           'install': 'Install custom module'
         }
     )
     
-    # Привязка функций из внешних файлов как методы класса
+    # Multilingual support at the package-class level
+    LANGUAGES = {
+        "en": { "no_modules": "⚠️ No loaded modules found." },
+        "ru": { "no_modules": "⚠️ Нет загруженных модулей." }
+    }
+    
+    # Bind functions imported from external files as class methods
     list_modules = list_modules
     install_module = install_module
 ```
 
 ---
 
-### Событийные декораторы:
+### Localizing Graphical Assets
 
-* `@on_command(command_name: str | list[str])` — Регистрирует команду юзербота. Поддерживает списки алиасов и регистронезависимость. Работает на базе кастомного динамического фильтра (префиксы берутся из оперативной памяти клиента).
-* `@on_assistant_command(command_name: str | list[str])` — Регистрирует текстовый обработчик команд внутри бота-ассистента (например, `/start`).
-* `@on_assistant_inline()` — Обрабатывает входящие инлайн-запросы, отправленные боту-ассистенту.
-* `@on_assistant_callback(pattern: str)` — Обрабатывает клики на кнопки ассистента с фильтрацией по префиксу `callback_data`.
+If your plugin includes custom images or interactive menu covers, you can load localized images dynamically by running a quick file existence check:
+
+```Python
+# Fetch system language directly from KaguyaClient's RAM cache
+lang = client.get_lang() 
+
+# Format path to localized file
+local_path = f'assets/Kaguya_modules_{lang}.png'
+
+# Fallback to default asset if localized file is missing
+if not os.path.exists(local_path):
+    local_path = 'assets/Kaguya_modules.png'
+
+# Set unique Telegram cache keys for each localized file to prevent overlapping
+cache_key = f'modules_menu_file_id_{lang}'
+
+await client.edit_media_cached(
+    message=message,
+    cache_key=cache_key,
+    local_path=local_path,
+    caption=text
+)
+```
 
 ---
 
-### Защита кнопок
+### Event Decorators:
 
-Любые клики по кнопкам ассистента должны проходить верификацию на отправителя во избежание несанкционированного доступа посторонних участников чата:
+* `@on_command(command_name: str | list[str])` — Registers a userbot chat command. Supports alias lists and is case-insensitive. Works via a custom dynamic filter retrieving command prefixes directly from the running client's memory.
+* `@on_assistant_command(command_name: str | list[str])` — Registers a text command handler for the assistant bot (e.g., `/start`).
+* `@on_assistant_inline()` — Handles incoming inline queries sent to the assistant bot.
+* `@on_assistant_callback(pattern: str)` — Handles button click callback queries with pre-filtering by `callback_data` prefix.
+
+---
+
+### Callback Protection
+
+To prevent unauthorized users from hijacking your assistant buttons in public chats, implement sender verification checks:
 
 ```Python
-# На примере системного переводчика
+# Example from the system translator module
 @on_assistant_callback('tr_')
 async def translator_callback(self, client: Client, callback_query: CallbackQuery):
     settings = client.db.get_category('settings')
     owner_id = await settings.get('owner_id')
 
-    # Блокировка несанкционированных кликов
+    # Block unauthorized clicks
     if callback_query.from_user.id != owner_id:
         await callback_query.answer(
-            text='Kaguya: Эй, это не твоя панель управления!',
+            text='Kaguya: Hey, this is not your control panel!',
             show_alert=True
         )
         return
@@ -309,51 +351,49 @@ async def translator_callback(self, client: Client, callback_query: CallbackQuer
 
 ---
 
-### Статический анализатор кода
+### Static Code Analyzer
 
-При динамической установке модулей через команду `.установить` (ответом на файл `.py`, `.txt` или `.zip`), ядро автоматически проверяет код на наличие заблокированных системных вызовов перед компиляцией.
+When dynamically installing plugins via the `.install` / `.установить` commands (by replying to a `.py`, `.txt`, or `.zip` file), the core client automatically runs static code analysis checks prior to compilation.
 
-Бот проверяет код на наличие следующих триггеров:
+The analyzer scans the incoming code for the following blocked call patterns:
 `eval(`, `exec(`, `__import__`, `os.system`, `subprocess`, `.session`, `session_path`.
 
-Если хотя бы один паттерн найден — установка прерывается, а временные файлы безопасно стираются с диска для предотвращения возможного заражения системы.
+If any match is detected, the installation terminates immediately, and temporary files are securely deleted from the disk to prevent any environmental impact.
 
 ---
 
-## 6. Часто задаваемые вопросы (FAQ)
+## 6. Frequently Asked Questions (FAQ)
 
 ---
 
-#### В: Батник `[Windows]Kaguya_run.bat` выдает ошибку "Failed building wheel for tgcrypto". Бот запустится? 
-**О:** Да, запустится и будет работать абсолютно стабильно. Ошибка возникает потому что разработчики tgcrypto еще не скомпилировали готовые бинарные пакеты под Windows. Можно установить компилятор C++ и перезапустить скрипт.
+**Q: The `[Windows]Kaguya_run.bat` script throws a "Failed building wheel for tgcrypto" error. Will the bot start?**  
+**A:** Yes, it will start and operate normally. This error occurs because pre-compiled wheel packages of `tgcrypto` are not always available for all Windows environments. You can install a C++ compiler to compile it, but the bot will automatically fall back to Python's built-in cryptographic solutions and run stably without it.
 
 ---
 
-#### В: Как мне добавить стороннюю библиотеку для моего собственного модуля?
-**О:** Поскольку ядро Кагуи должно оставаться чистым и независимым, не нужно добавлять свои библиотеки в корневой `requirements.txt`. Вместо этого используй Python-паттерн обработки исключений импорта в начале своего модуля:
+**Q: How do I add external dependencies for my custom module?**  
+**A:** Since the Kaguya core should remain clean and independent, you do not need to add your packages to the root `requirements.txt`. Instead, use the standard Python import exception handling pattern at the top of your custom module:
 ```Python
 try:
     import some_library
 except ImportError:
-    raise ImportError("Для работы модуля требуется библиотека 'some_library'. Установи её командой: pip install some_library")
+    raise ImportError("This module requires the 'some_library' package. Install it via terminal: pip install some_library")
 ```
-Наша песочница при попытке установить твой модуль через `.установить` безопасно перехватит этот `ImportError` и выведет твою инструкцию пользователю прямо в чат Telegram.
+When installing your module via `.install`, the framework will catch the `ImportError` safely and display your installation instructions in the Telegram chat instead of crashing.
 
 ---
 
-#### Мой бот-ассистент не реагирует на клики кнопок или инлайн-запросы. Что делать?
-**О:** Самая частая причина — выключенный инлайн-режим в настройках самого бота в Telegram. [**Инструкция настройки Инлайн-режима описана в 4 разделе.**](#4-интеграция-бота-ассистента)
+**Q: My assistant bot does not respond to button clicks or inline queries. What should I do?**  
+**A:** The most common cause is that inline mode is disabled in BotFather. [Please follow the inline setup guide in Section 4.](#4-helper-bot-integration)
 
 ---
 
-#### Как запустить Кагую на удаленном сервере 24/7?
-**О:** Самый надежный способ запустить бота круглосуточно — использовать VPS под управлением Linux (Ubuntu/Debian). [Подробный алгоритм запуска описан в тут.](#запуск-на-ubuntu)
+**Q: How do I run Kaguya 24/7 on a remote server?**  
+**A:** The most reliable way is using a VPS running Linux (Ubuntu/Debian). [Follow the complete setup and daemonization guide in the Ubuntu section.](#running-on-ubuntu)
 
 ---
 
-#### Где хранятся настройки и кэш бота? Как их полностью сбросить?
-**О:** Все данные хранятся в папке `data/storage/` в виде высокоскоростных локальных баз SQLite `diskcache`.
-
-* Если тебе нужно отвязать бота-помощника, используй команду `.токен_удалить`.
-* Если ты хочешь полностью сбросить все настройки бота до заводских, просто останови бота в консоли и удали папку `data/storage/` с диска. При следующем старте Кагуя создаст чистую базу автоматически. 
-* Если необходимо сбросить сессии, удали файлы `.session` в папке `data/`.
+**Q: Where are the bot settings and cache stored? How do I reset them completely?**  
+**A:** All persistent configuration and cached files are stored in `data/storage/` as optimized SQLite Key-Value tables managed by `diskcache`.
+* To unbind your helper bot, use the `.token_rm` command.
+* To perform a complete factory reset, stop the bot in the terminal and delete the `data/` folder. Kaguya will recreate clean databases automatically upon next boot.

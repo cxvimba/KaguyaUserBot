@@ -54,27 +54,56 @@ class CalculatorModule(BaseModule):
     meta = ModuleInfo(
         name='Калькулятор',
         description='Математический калькулятор',
-        version='1.0.0',
+        version='1.1.0',
         author='cxvimba',
         commands={
-            'calc | мат | кальк': 'Вычислить математическое выражение'
+            'calc | калькулятор': 'Вычислить математическое выражение'
         }
     )
 
-    @on_command(['calc', 'мат', "кальк"])
+    LANGUAGES = {
+        'en': {
+            'usage': (
+                '🧮 <b>Kaguya | Calculator</b>\n\n'
+                ' └ Example: <code>{p}calc (2 + 2) * 5</code>'
+            ),
+            'calculating': '⏳ <b>Kaguya:</b> Calculating...',
+            'result': (
+                '🧮 <b>Kaguya | Result:</b>\n\n'
+                ' ├ 📝 <code>{expression}</code>\n'
+                ' └ 📊 <b>Answer:</b> <code>{result}</code>'
+            ),
+            'zero_division': '❌ <b>Kaguya:</b> Error — division by zero!',
+            'calc_error': '❌ <b>Kaguya:</b> Calculation error. Reason: <code>{error}</code>'
+        },
+        'ru': {
+            'usage': (
+                '🧮 <b>Kaguya | Калькулятор</b>\n\n'
+                ' └ Пример: <code>{p}calc (2 + 2) * 5</code>'
+            ),
+            'calculating': '⏳ <b>Kaguya:</b> Вычисление...',
+            'result': (
+                '🧮 <b>Kaguya | Результат:</b>\n\n'
+                ' ├ 📝 <code>{expression}</code>\n'
+                ' └ 📊 <b>Ответ:</b> <code>{result}</code>'
+            ),
+            'zero_division': '❌ <b>Kaguya:</b> Ошибка — деление на ноль!',
+            'calc_error': '❌ <b>Kaguya:</b> Ошибка вычислений. Причина: <code>{error}</code>'
+        }
+    }
+
+    @on_command(['calc', 'мат', 'калькулятор'])
     async def calculate_cmd(self, client: Client, message: Message):
         """Парсит и вычисляет математическое выражение."""
         if len(message.command) < 2:
             p = get_prefix(client)
             await message.edit_text(
-                f'🧮 <b>Kaguya | Калькулятор</b>\n\n'
-                f' └ Пример: <code>{p}calc (2 + 2) * 5</code>'
+                self.get_text('usage').format(p=p)
             )
             return
 
         expression = message.text.split(maxsplit=1)[1]
-
-        await message.edit_text('⏳ <b>Kaguya:</b> Вычисление...')
+        await message.edit_text(self.get_text('calculating'))
 
         try:
             tree = ast.parse(expression, mode='eval')
@@ -84,12 +113,12 @@ class CalculatorModule(BaseModule):
                 result = int(result)
 
             await message.edit_text(
-                f'🧮 <b>Kaguya | Результат:</b>\n\n'
-                f' ├ 📝 <code>{expression}</code>\n'
-                f' └ 📊 <b>Ответ:</b> <code>{result}</code>'
+                self.get_text('result').format(expression=expression, result=result)
             )
 
         except ZeroDivisionError:
-            await message.edit_text('❌ <b>Kaguya:</b> Ошибка — деление на ноль!')
+            await message.edit_text(self.get_text('zero_division'))
         except Exception as e:
-            await message.edit_text(f'❌ <b>Kaguya:</b> Ошибка вычислений. Причина: <code>{e}</code>')
+            await message.edit_text(
+                self.get_text('calc_error').format(error=e)
+            )

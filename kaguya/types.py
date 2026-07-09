@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from typing import Dict, Callable, Optional
-from pyrogram import Client, filters
+from pyrogram import filters, Client
 from pyrogram.filters import Filter
 from pyrogram.types import Message
 
@@ -23,9 +23,29 @@ class ModuleInfo:
 class BaseModule:
     """Базовый класс для всех модулей."""
     meta: ModuleInfo
+    LANGUAGES: dict = {}
 
     def __init__(self, client: Client):
         self.client = client
+
+    def get_text(self, key: str) -> str:
+        """
+        Возвращает локализированный текст по ключу.
+        Если текущего языка системы нет в LANGUAGES — возвращает значение первого языка в списке локализации модуля.
+        """
+        if not self.LANGUAGES:
+            return f'[{key}]'
+
+        lang = self.client.get_lang()
+
+        if lang in self.LANGUAGES and key in self.LANGUAGES[lang]:
+            return self.LANGUAGES[lang][key]
+
+        first_lang = list(self.LANGUAGES.keys())[0]
+        if key in self.LANGUAGES[first_lang]:
+            return self.LANGUAGES[first_lang][key]
+
+        return f'[{key}]'
 
 
 def on_event(custom_filter: Filter):

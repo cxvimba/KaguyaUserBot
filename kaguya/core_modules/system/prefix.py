@@ -9,9 +9,7 @@ async def change_prefix(self, client: Client, message: Message):
     if len(message.command) < 2:
         current = ' '.join([f'<code>{p}</code>' for p in client.prefixes])
         await message.edit_text(
-            f'⚙️ <b>Kaguya | Настройки префиксов</b>\n\n'
-            f'#️⃣ Текущие префиксы: {current}\n'
-            f' └ Пример: <code>{client.prefixes[0]}prefix . !</code>'
+            self.get_text('prefix_usage').format(current=current, p=client.prefixes[0])
         )
         return
 
@@ -19,7 +17,7 @@ async def change_prefix(self, client: Client, message: Message):
     clean_prefixes = list(set([p.strip() for p in new_prefixes if len(p.strip()) == 1]))
 
     if not clean_prefixes:
-        await message.edit_text('❌ <b>Kaguya:</b> Префикс должен состоять строго из одного символа!')
+        await message.edit_text(self.get_text('prefix_invalid'))
         return
 
     settings = client.db.get_category('settings')
@@ -28,4 +26,6 @@ async def change_prefix(self, client: Client, message: Message):
     client.prefixes = clean_prefixes
 
     formatted = ', '.join([f'<code>{p}</code>' for p in clean_prefixes])
-    await message.edit_text(f'✅ <b>Kaguya:</b> Префиксы команд успешно изменены на: {formatted}')
+    await message.edit_text(
+        self.get_text('prefix_success').format(formatted=formatted)
+    )

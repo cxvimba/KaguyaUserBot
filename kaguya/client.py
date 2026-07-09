@@ -85,6 +85,7 @@ class KaguyaClient(Client):
         self.assistant: Optional[Client] = None
         self.manager: Any = None
         self.prefixes: List[str] = ['.', '/']
+        self.language: str = 'ru'
 
     def register_module_handler(self, module_name: str, handler: Handler, group: int = 0):
         """Метод регистрации хэндлера модуля в клиенте."""
@@ -260,7 +261,10 @@ class KaguyaClient(Client):
 
             settings = self.db.get_category('settings')
             self.prefixes = await settings.get('prefixes', ['.', '/'])
+            self.language = await settings.get('language', 'ru')
+
             logger.info(f'Активные префиксы команд: {self.prefixes}')
+            logger.info(f'Текущий язык системы: {self.language}')
 
             await settings.set('owner_id', self.me.id)
 
@@ -278,8 +282,39 @@ class KaguyaClient(Client):
             self.manager.load_all_modules()
 
             logger.info('Kaguya успешно запущена и готова к работе!')
+
+            try:
+                lang = await settings.get('language', 'ru')
+                start_texts = {
+                    'ru': (
+                        '🌸 <b>Kaguya UserBot успешно запущена!</b>\n\n'
+                        '👾 Напиши <code>.kaguya</code> в любом чате для вызова меню.\n'
+                        '⚙️ Изменить язык интерфейса: <code>.lang en</code>'
+                    ),
+                    'en': (
+                        '🌸 <b>Kaguya UserBot successfully started!</b>\n\n'
+                        '👾 Type <code>.kaguya</code> in any chat to open the menu.\n'
+                        '⚙️ Change interface language: <code>.lang ru</code>'
+                    )
+                }
+                welcome_text = start_texts.get(lang, start_texts['ru'])
+                await self.send_message('me', welcome_text)
+                logger.info('Уведомление о старте отправлено в Избранное.')
+            except Exception as send_err:
+                logger.warning(f'Не удалось отправить приветственное сообщение: {send_err}')
+
             try:
                 while True:
                     await asyncio.sleep(1)
             finally:
                 await self.stop_assistant()
+
+    def get_lang(self) -> str:
+        """Возвращает текущий язык системы."""
+        return self.language
+
+    async def set_lang(self, lang: str):
+        """Обновляет язык системы."""
+        self.language = lang
+        settings = self.db.get_category('settings')
+        await settings.set('language', lang)
