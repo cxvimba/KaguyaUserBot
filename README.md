@@ -173,7 +173,7 @@ The assistant bot outputs interactive inline keyboards, flag grids, and settings
 Upon a successful startup, you will receive a confirmation message in your **Saved Messages («me»)** indicating system readiness, along with a quick tip on changing localization via the `.lang <code_here>` command.
 
 <p style="text-align: center;">
-   <img src="assets/Kaguya_inline_guide.png" alt="BotFather Inline Guide">
+   <img src="assets/Kaguya_inline_guide_en.png" alt="BotFather Inline Guide">
 </p>
 
 ---
