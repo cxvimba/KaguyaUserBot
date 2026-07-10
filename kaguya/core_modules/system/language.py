@@ -8,7 +8,6 @@ from kaguya.utils.prefix import get_prefix
 async def change_language(self, client: Client, message: Message):
     """Динамически изменяет язык системы."""
     current_lang = client.get_lang()
-    print(current_lang)
     p = get_prefix(client)
 
     if len(message.command) < 2:

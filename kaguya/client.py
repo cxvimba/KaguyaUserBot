@@ -87,6 +87,7 @@ class KaguyaClient(Client):
         self.prefixes: List[str] = ['.', '/']
         self.language: str = 'ru'
 
+
     def register_module_handler(self, module_name: str, handler: Handler, group: int = 0):
         """Метод регистрации хэндлера модуля в клиенте."""
         self.add_handler(handler, group)
@@ -102,6 +103,7 @@ class KaguyaClient(Client):
                 self.remove_handler(handler, group)
             except Exception as e:
                 logger.warning(f'Не удалось удалить хэндлер модуля {module_name}: {e}')
+
 
     async def start_assistant(self, token: str):
         """Инициализирует бота-ассистента, привязывает инлайн-обработчики."""
@@ -170,6 +172,7 @@ class KaguyaClient(Client):
             await self.assistant.stop()
             self.assistant = None
 
+
     async def edit_media_cached(
         self, message: Message, cache_key: str, local_path: str,
         caption: str, reply_markup: Optional[InlineKeyboardMarkup] = None
@@ -207,6 +210,7 @@ class KaguyaClient(Client):
                 return res
             else:
                 raise media_error
+
 
     def register_core_handlers(self):
         """Регистрация системных хэндлеров."""
@@ -251,6 +255,7 @@ class KaguyaClient(Client):
 
         menu_filter = getattr(core_menu_callback, '__kaguya_filter__')
         self.register_module_handler('core_system', MessageHandler(core_menu_callback, menu_filter))
+
 
     async def start_kaguya(self):
         """Запускает жизненный цикл Kaguya."""
@@ -309,6 +314,7 @@ class KaguyaClient(Client):
             finally:
                 await self.stop_assistant()
 
+
     def get_lang(self) -> str:
         """Возвращает текущий язык системы."""
         return self.language
@@ -318,3 +324,26 @@ class KaguyaClient(Client):
         self.language = lang
         settings = self.db.get_category('settings')
         await settings.set('language', lang)
+
+
+    async def set_fsm(self, state: str, data: Optional[dict] = None):
+        """Устанавливает состояние FSM."""
+        settings = self.db.get_category('settings')
+        await settings.set('fsm_state', state)
+        await settings.set('fsm_data', data or {})
+
+    async def get_fsm_state(self) -> Optional[str]:
+        """Возвращает состояние FSM."""
+        settings = self.db.get_category('settings')
+        return await settings.get('fsm_state')
+
+    async def get_fsm_data(self) -> dict:
+        """Возвращает данные FSM."""
+        settings = self.db.get_category('settings')
+        return await settings.get('fsm_data', {})
+
+    async def clear_fsm(self):
+        """Сбрасывает состояние FSM."""
+        settings = self.db.get_category('settings')
+        await settings.delete('fsm_state')
+        await settings.delete('fsm_data')
