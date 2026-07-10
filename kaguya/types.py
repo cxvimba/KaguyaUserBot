@@ -133,3 +133,17 @@ def on_assistant_command(command_name: str | list[str]):
         func_cb.__kaguya_assistant_command__ = cmd_filter
         return func_cb
     return decorator
+
+
+def on_fsm(state: str):
+    """Обработчик сообщений в определенном состоянии FSM."""
+    async def func(_, client, message: Message):
+        if not message.text and not message.caption:
+            return False
+
+        settings = client.db.get_category('settings')
+        current_state = await settings.get('fsm_state')
+        return current_state == state
+
+    fsm_filter = filters.create(func)
+    return on_event(fsm_filter)
