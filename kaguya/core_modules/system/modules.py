@@ -79,7 +79,7 @@ async def list_modules(self, client: Client, message: Message):
                 text += f' └ <b>{self.get_text("commands")}:</b>\n' + '\n'.join(cmds_list)
             else:
                 text += f' └ <b>{self.get_text("commands")}:</b> {self.get_text("none")}'
-
+            await message.edit_text(text)
             return
 
         count = len(self.client.loaded_modules)
