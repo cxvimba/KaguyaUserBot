@@ -25,9 +25,9 @@ class SystemModule(BaseModule):
 
     LANGUAGES = {
         'en': {
-            'author': "Author",
-            'commands': "Commands",
-            'none': "none",
+            'author': 'Author',
+            'commands': 'Commands',
+            'none': 'none',
 
             'assistant_welcome': (
                 '🌸 <b>Kaguya | Assistant</b>\n\n'
@@ -138,9 +138,9 @@ class SystemModule(BaseModule):
         },
 
         'ru': {
-            'author': "Автор",
-            'commands': "Команды",
-            'none': "отсутствуют",
+            'author': 'Автор',
+            'commands': 'Команды',
+            'none': 'отсутствуют',
 
             'assistant_welcome': (
                 '🌸 <b>Kaguya | Ассистент</b>\n\n'
