@@ -1,3 +1,4 @@
+import asyncio
 import os
 import aiohttp
 import logging
@@ -42,6 +43,8 @@ async def set_token(self, client: Client, message: Message):
 
         await message.edit_text(self.get_text('token_starting'))
         await client.start_assistant(token)
+
+        await asyncio.sleep(2)
 
         await message.edit_text(self.get_text('token_checking_inline'))
 

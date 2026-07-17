@@ -41,6 +41,16 @@ else
     exit 1
 fi
 
+if command -v termux-wake-lock &> /dev/null; then
+  termux-wake-lock
+  echo "[Kaguya] Android Wakelock активирован."
+fi
+
 echo "[Kaguya] Запуск Kaguya UserBot..."
 echo "--------------------------------------------------"
 python main.py
+
+if command -v termux-wake-unlock &> /dev/null; then
+  termux-wake-unlock
+  echo "[Kaguya] Android Wakelock отключен."
+fi
